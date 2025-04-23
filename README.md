@@ -1,6 +1,6 @@
-# Desafio Realizado em Dataflex dentro de 1 hora
+# Desafio Realizado em Dataflex dentro de 1 hora (Finalizado)
 
-A maior dificuldade que tive foi em ordenar os dados, e pelo tempo ser curto não consegui fazer um código muito performático.
+Atualização completando o projeto.
 
 # Desafio Técnico: Performance e Análise de Dados via API
 

@@ -29,18 +29,14 @@ Struct stUsers
 End_Struct
 
 Object oApplication is a cApplication
-
-    Object oConnection is a cConnection
-        Use LoginEncryption.pkg
-    End_Object
-
 End_Object
 
 Object oWebApp is a cWebAppBasic
-    Use Users.wo
-    Use SuperUsers.wo
-    Use TopCountries.wo
-    Use TeamInsights.wo
+    Use src\routes\Users.wo
+    Use src\routes\SuperUsers.wo
+    Use src\routes\TopCountries.wo
+    Use src\routes\TeamInsights.wo
+    Use src\routes\ActiveUsersPerDay.wo
     
 End_Object
 

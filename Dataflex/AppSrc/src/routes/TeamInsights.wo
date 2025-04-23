@@ -1,0 +1,134 @@
+﻿Use cWebHttpHandler.pkg
+
+Struct stTeamProjects
+    String nome
+    Boolean concluido
+End_Struct
+
+Struct stTeamInsights
+    String name
+    Integer iTotalMembers
+    Integer iTotalActiveMembers
+    Integer iTotalLeaders
+    Integer iTotalProjects
+    Integer iTotalProjectsCompleted
+    Number nTotalActiveMembers
+End_Struct
+
+Struct stResponseTeamInsights
+    Integer iTimeEnlapse
+    stTeamInsights[] tTeam
+End_Struct
+
+Object oTeamInsights is a cWebHttpHandler
+    
+    Set psPath to "team-insights"
+    Set psVerbs to "GET"
+    
+    //Aux Functions
+    Function f_ComparisonTeam stTeamInsights tTeam stUsers tUser Returns Integer
+        If (tUser.equipe.nome < tTeam.name) Function_Return (GT)
+        If (tUser.equipe.nome > tTeam.name) Function_Return (LT)
+
+        Function_Return (EQ)
+    End_Function
+    
+    //Http
+    Procedure OnHttpGet String sPath String sAcceptType
+        TimeSpan tsTimeEnlapse
+        DateTime dtInitialTimer
+        Integer iChnl iCount iCountTeam iSizeTeam iCountProjetos iIndexTeam
+        Handle hoJson
+        Boolean bSuccess bExists bExistsTeam
+        stResponseTeamInsights tResponse
+        stUsers[] tUsers tUsersFiltered
+        stTeamInsights[] tTeam
+        UChar[] ucData ucFile
+        
+        Move (CurrentDateTime()) to dtInitialTimer
+        
+        Get psDataPath of (phoWorkspace(ghoApplication)) to sPath
+        Move (sPath + "\Uploads\usuarios.json") to sPath
+        
+        File_Exist sPath bExists
+        
+        If (bExists) Begin
+            //Ler arquivo JSON
+            Move (Seq_New_Channel()) to iChnl
+            Direct_Input channel iChnl ("binary:" + sPath)
+            Read_Block channel iChnl ucFile -1
+            Close_Input channel iChnl
+            Send Seq_Release_Channel iChnl
+
+            //JSON to DataType
+            Get Create (RefClass(cJsonObject)) to hoJson
+            Get ParseUtf8 of hoJson ucFile to bSuccess
+            
+            If (not(bSuccess)) Begin
+                Send Destroy of hoJson
+                Send SetResponseStatus 500 "JSON not loaded" 2
+                Procedure_Return
+            End
+            
+            Get JsonToDataType of hoJson to tUsers
+            Send Destroy of hoJson
+            
+            //Filtrar
+            For iCount from 0 to (SizeOfArray(tUsers)-1)
+                
+                Move (SearchArray(tUsers[iCount],tTeam,Self, (RefFunc(f_ComparisonTeam)))) to iIndexTeam
+                If (iIndexTeam=-1) Begin
+                    Move (SizeOfArray(tTeam)) to iIndexTeam
+                    
+                    Move tUsers[iCount].equipe.nome to tTeam[iIndexTeam].name
+                    
+                    If (tUsers[iCount].equipe.lider=True) Move 1 to tTeam[iIndexTeam].iTotalLeaders
+                    If (tUsers[iCount].ativo=True) Move 1 to tTeam[iIndexTeam].iTotalActiveMembers
+                    
+                    For iCountProjetos from 0 to (SizeOfArray(tUsers[iCount].equipe.projetos)-1)
+                        If (tTeam[iIndexTeam].iTotalProjectsCompleted=0 and tUsers[iCount].equipe.projetos[iCountProjetos].concluido=True) Move 1 to tTeam[iIndexTeam].iTotalProjectsCompleted
+                        Else If (tUsers[iCount].equipe.projetos[iCountProjetos].concluido=True) Increment tTeam[iIndexTeam].iTotalProjectsCompleted
+                        
+                        If (tTeam[iIndexTeam].iTotalProjects=0) Move 1 to tTeam[iIndexTeam].iTotalProjects
+                        Else Increment tTeam[iIndexTeam].iTotalProjects
+                    Loop
+                                        
+                    Move 1 to tTeam[iIndexTeam].iTotalMembers
+                End
+                Else Begin                                            
+                    If (tUsers[iCount].equipe.lider=True) Increment tTeam[iIndexTeam].iTotalLeaders
+                    If (tUsers[iCount].ativo=True) Increment tTeam[iIndexTeam].iTotalActiveMembers
+                    
+                    For iCountProjetos from 0 to (SizeOfArray(tUsers[iCount].equipe.projetos)-1)
+                        If (tUsers[iCount].equipe.projetos[iCountProjetos].concluido) Increment tTeam[iIndexTeam].iTotalProjectsCompleted
+                        Increment tTeam[iIndexTeam].iTotalProjects
+                    Loop
+                    
+                    Increment tTeam[iIndexTeam].iTotalMembers
+                End             
+                
+            Loop
+            
+            For iCountTeam from 0 to (SizeOfArray(tTeam)-1)
+                Move (FormatNumber((Number(tTeam[iCountTeam].iTotalActiveMembers)/Number(tTeam[iCountTeam].iTotalMembers))*100.00,2)) to tTeam[iCountTeam].nTotalActiveMembers
+            Loop
+            
+            Move (CurrentDateTime()-dtInitialTimer) to tsTimeEnlapse
+            Move (SpanTotalMilliseconds(tsTimeEnlapse)) to tResponse.iTimeEnlapse
+            Move tTeam to tResponse.tTeam
+            
+            //Parse DataType to Json
+            Get Create (RefClass(cJsonObject)) to hoJson
+            Send DataTypeToJson of hoJson tResponse
+            Set peWhiteSpace of hoJson to jpWhitespace_Spaced
+            Get StringifyUtf8 of hoJson to ucData
+            Send Destroy of hoJson
+
+            Send OutputUChar ucData
+        End
+        Else Begin
+            Send SetResponseStatus 500 "File not exists" 2
+        End        
+    End_Procedure
+    
+End_Object

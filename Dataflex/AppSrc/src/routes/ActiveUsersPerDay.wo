@@ -1,0 +1,101 @@
+﻿Use cWebHttpHandler.pkg
+
+Struct stActiveUsersPerDay
+    Date data
+    Integer iTotal
+End_Struct
+
+Struct stResponseActiveUsersPerDay
+    Integer iTimeEnlapse
+    stActiveUsersPerDay[] tLogins
+End_Struct
+
+Object oActiveUsersPerDay is a cWebHttpHandler
+    
+    Set psPath to "active-users-per-day"
+    Set psVerbs to "GET"
+    
+    //Aux Functions
+    Function f_ComparisonLog stActiveUsersPerDay tLogins stLogs tLog Returns Integer
+        If (tLog.data < tLogins.data) Function_Return (GT)
+        If (tLog.data > tLogins.data) Function_Return (LT)
+
+        Function_Return (EQ)
+    End_Function
+    
+    //Http
+    Procedure OnHttpGet String sPath String sAcceptType
+        TimeSpan tsTimeEnlapse
+        DateTime dtInitialTimer
+        Integer iChnl iCount iCountLog iIndexLog
+        Handle hoJson
+        Boolean bSuccess bExists bExistsTeam
+        stResponseActiveUsersPerDay tResponse
+        stUsers[] tUsers tUsersFiltered
+        stActiveUsersPerDay[] tLogins
+        UChar[] ucData ucFile
+        
+        Move (CurrentDateTime()) to dtInitialTimer
+        
+        Get psDataPath of (phoWorkspace(ghoApplication)) to sPath
+        Move (sPath + "\Uploads\usuarios.json") to sPath
+        
+        File_Exist sPath bExists
+        
+        If (bExists) Begin
+            //Ler arquivo JSON
+            Move (Seq_New_Channel()) to iChnl
+            Direct_Input channel iChnl ("binary:" + sPath)
+            Read_Block channel iChnl ucFile -1
+            Close_Input channel iChnl
+            Send Seq_Release_Channel iChnl
+
+            //JSON to DataType
+            Get Create (RefClass(cJsonObject)) to hoJson
+            Get ParseUtf8 of hoJson ucFile to bSuccess
+            
+            If (not(bSuccess)) Begin
+                Send Destroy of hoJson
+                Send SetResponseStatus 500 "JSON not loaded" 2
+                Procedure_Return
+            End
+            
+            Get JsonToDataType of hoJson to tUsers
+            Send Destroy of hoJson
+            
+            //Filtrar
+            For iCount from 0 to (SizeOfArray(tUsers)-1)
+                For iCountLog from 0 to (SizeOfArray(tUsers[iCount].logs)-1)
+                    Move (SearchArray(tUsers[iCount].logs[iCountLog],tLogins,Self, (RefFunc(f_ComparisonLog)))) to iIndexLog
+                    If (iIndexLog=-1) Begin
+                        Move (SizeOfArray(tLogins)) to iIndexLog
+                        If (tUsers[iCount].logs[iCountLog].acao="login") Begin
+                            Move tUsers[iCount].logs[iCountLog].data to tLogins[iIndexLog].data
+                            Increment tLogins[iIndexLog].iTotal
+                        End
+                    End
+                    Else Begin
+                        Increment tLogins[iIndexLog].iTotal                                      
+                    End                    
+                Loop                
+            Loop
+            
+            Move (CurrentDateTime()-dtInitialTimer) to tsTimeEnlapse
+            Move (SpanTotalMilliseconds(tsTimeEnlapse)) to tResponse.iTimeEnlapse
+            Move tLogins to tResponse.tLogins
+            
+            //Parse DataType to Json
+            Get Create (RefClass(cJsonObject)) to hoJson
+            Send DataTypeToJson of hoJson tResponse
+            Set peWhiteSpace of hoJson to jpWhitespace_Spaced
+            Get StringifyUtf8 of hoJson to ucData
+            Send Destroy of hoJson
+
+            Send OutputUChar ucData
+        End
+        Else Begin
+            Send SetResponseStatus 500 "File not exists" 2
+        End        
+    End_Procedure
+    
+End_Object
