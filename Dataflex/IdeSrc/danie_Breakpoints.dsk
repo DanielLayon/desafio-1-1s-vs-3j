@@ -1,0 +1,9 @@
+[E:\Sistema\Codecon\AppSrc\SuperUsers.wo]
+Source32=Direct_Input channel iChnl ("binary:" + sPath)
+ConditionEnabled32=0
+Condition32= 
+32=1
+Source56=Move (SpanTotalMilliseconds(tsTimeEnlapse)) to tResponse.iTimeEnlapse
+ConditionEnabled56=0
+Condition56= 
+56=1

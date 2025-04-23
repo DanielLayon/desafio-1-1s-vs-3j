@@ -1,0 +1,47 @@
+﻿Use AllWebAppClasses.pkg
+Use cConnection.pkg
+
+Struct stLogs
+    Date data
+    String acao
+End_Struct
+
+Struct stProjects
+    String nome
+    Boolean concluido
+End_Struct
+
+Struct stTeam
+    String nome
+    Boolean lider
+    stProjects[] projetos
+End_Struct
+
+Struct stUsers
+    String id
+    String nome
+    Integer idade
+    Integer score
+    Boolean ativo
+    String pais
+    stTeam equipe
+    stLogs[] logs
+End_Struct
+
+Object oApplication is a cApplication
+
+    Object oConnection is a cConnection
+        Use LoginEncryption.pkg
+    End_Object
+
+End_Object
+
+Object oWebApp is a cWebAppBasic
+    Use Users.wo
+    Use SuperUsers.wo
+    Use TopCountries.wo
+    Use TeamInsights.wo
+    
+End_Object
+
+Send StartWebApp of oWebApp
